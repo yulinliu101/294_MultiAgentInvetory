@@ -75,7 +75,7 @@ class Simulator:
 
     def step(self, action, currentInventory, curDemand, last):
         nextInventory = self.nextInventory(currentInventory, action, curDemand)
-        reward = self._reward(action, nextInventory, curDemand,last)
+        reward = self._reward(action, nextInventory, curDemand, last)
         return nextInventory, reward
 
 
