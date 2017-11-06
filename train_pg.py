@@ -1,6 +1,5 @@
 import numpy as np
 import tensorflow as tf
-import gym
 import logz
 import os
 import time
@@ -172,7 +171,7 @@ def train_PG(exp_name='',
                 ac = sess.run(sy_sampled_ac, feed_dict={sy_ob_no : ob})
                 # ac = ac[0]
                 acs.append(ac.flatten())
-                ob, rew = env.step(ac, ob, demand[steps, :], demand[steps+1, :], last)
+                ob, rew = env.step(ac, ob, demand[steps, :], last)
                 rewards.append(rew)
                 steps += 1
 

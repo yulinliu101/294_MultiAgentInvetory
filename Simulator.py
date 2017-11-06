@@ -34,7 +34,7 @@ class Simulator:
         # mu should have shape of N_prod * 1
         # cov should have shape of N_prod * N_prod
         np.random.seed(seed)
-        self.demandVec = np.exp(np.random.multivariate_normal(mean = np.log(mu), cov = cov, size = self.Tstamp + 1))
+        self.demandVec = np.exp(np.random.multivariate_normal(mean = np.log(mu), cov = cov, size = self.Tstamp))
         return self.demandVec
 
     def actionSpace(self):
@@ -60,7 +60,7 @@ class Simulator:
     def _reward(self, action, inventory, demand, last = False):
         # here action is a vector of q (1 by N) and is the action for timestamp t
         # inventory has shape 1 by N and is the inventory for timestamp (t+1)
-        # demand has shape 1 by N and is the inventory for timestamp (t+1)
+        # demand has shape 1 by N and is the inventory for timestamp (t)
         if last:
             return (self.price.dot(demand.T) - (self.costQ.dot(action.T) + 
                                  self.costLastInv.dot(np.maximum(np.zeros(shape = inventory.shape), inventory).T) - 
@@ -73,9 +73,9 @@ class Simulator:
     def nextInventory(self, curInventory, curAction, curDemand):
         return curInventory + curAction - curDemand
 
-    def step(self, action, currentInventory, curDemand, nextDemand, last):
+    def step(self, action, currentInventory, curDemand, last):
         nextInventory = self.nextInventory(currentInventory, action, curDemand)
-        reward = self._reward(action, nextInventory, nextDemand,last)
+        reward = self._reward(action, nextInventory, curDemand,last)
         return nextInventory, reward
 
 
