@@ -4,7 +4,7 @@ import logz
 import os
 import time
 import inspect
-from Simulator import Simulator
+from MASimulator import MASimulator as Simulator
 import random
 #============================================================================================#
 # Utilities
@@ -46,7 +46,7 @@ def pathlength(path):
 # Policy Gradient
 #============================================================================================#
 
-def train_PG(exp_name='',
+def train_MAPG(exp_name='',
              n_iter=100, 
              gamma=1.0, 
              min_timesteps_per_batch=1000, 
@@ -54,7 +54,6 @@ def train_PG(exp_name='',
              reward_to_go=True, 
              logdir=None, 
              normalize_advantages=True,
-             nn_baseline=True, 
              seed=101,
              # network arguments
              n_layers=1,
@@ -68,7 +67,7 @@ def train_PG(exp_name='',
     logz.configure_output_dir(logdir)
 
     # Log experimental parameters
-    args = inspect.getargspec(train_PG)[0]
+    args = inspect.getargspec(train_MAPG)[0]
     locals_ = locals()
     params = {k: locals_[k] if k in locals_ else None for k in args}
     logz.save_params(params)
@@ -90,10 +89,11 @@ def train_PG(exp_name='',
     # Observation and action sizes
     ob_dim = env.obs_dim()
     ac_dim = env.act_dim()
+    nAgent = env.agent_dim()
     print('observation dimension is: ', ob_dim)
     print('action dimension is: ', ac_dim)
     #========================================================================================#
-    # PG Network placeholders
+    # PG Networks
     #========================================================================================#
     sy_ob_no = tf.placeholder(shape=[None, ob_dim], name="ob", dtype=tf.float32)
     sy_ac_na = tf.placeholder(shape=[None, ac_dim], name="ac", dtype=tf.float32) 
@@ -117,19 +117,19 @@ def train_PG(exp_name='',
     #========================================================================================#
     # Critic network
     #========================================================================================#
-    if nn_baseline:
-        baseline_prediction = tf.squeeze(build_mlp(
-                                sy_ob_no, 
-                                output_size = 1, 
-                                scope = "nn_baseline" + str(seed),
-                                n_layers = n_layers,
-                                size = size))
-        # Define placeholders for targets, a loss function and an update op for fitting a 
-        # neural network baseline. These will be used to fit the neural network baseline. 
-        baseline_target = tf.placeholder(shape = [None], name = 'baseline_target_qn', dtype = tf.float32)
-        baseline_loss = tf.nn.l2_loss(baseline_target - baseline_prediction)
-        baseline_update_op = tf.train.AdamOptimizer(learning_rate).minimize(baseline_loss)
+    sy_ob_critic = tf.placeholder(shape=[None, ob_dim + ac_dim * nAgent], name="ob", dtype=tf.float32)
 
+    baseline_prediction = tf.squeeze(build_mlp(
+                            sy_ob_critic, 
+                            output_size = 1, 
+                            scope = "nn_baseline" + str(seed),
+                            n_layers = n_layers,
+                            size = size))
+    # Define placeholders for targets, a loss function and an update op for fitting a 
+    # neural network baseline. These will be used to fit the neural network baseline. 
+    baseline_target = tf.placeholder(shape = [None], name = 'baseline_target_qn', dtype = tf.float32)
+    baseline_loss = tf.nn.l2_loss(baseline_target - baseline_prediction)
+    baseline_update_op = tf.train.AdamOptimizer(learning_rate).minimize(baseline_loss)
 
     #========================================================================================#
     # Tensorflow Engineering: Config, Session, Variable initialization
@@ -208,21 +208,17 @@ def train_PG(exp_name='',
         # Compute Baselines
         #====================================================================================#
 
-        if nn_baseline:
-            q_n_mean = q_n.mean()
-            q_n_std = q_n.std()
-            q_n = (q_n - q_n_mean)/q_n_std
-            b_n = baseline_prediction
-            adv_n_baseline = q_n - b_n
-        else:
-            adv_n = q_n.copy()    
+        q_n_mean = q_n.mean()
+        q_n_std = q_n.std()
+        q_n = (q_n - q_n_mean)/q_n_std
+        b_n = baseline_prediction
+        adv_n_baseline = q_n - b_n
 
         #====================================================================================#
         # Optimizing Neural Network Baseline
         #====================================================================================#
-        if nn_baseline:
-            _, adv_n = sess.run([baseline_update_op, adv_n_baseline], feed_dict={baseline_target: q_n, sy_ob_no: ob_no})
-            adv_n = adv_n * q_n_std + q_n_mean
+        _, adv_n = sess.run([baseline_update_op, adv_n_baseline], feed_dict={baseline_target: q_n, sy_ob_critic: TODO})
+        adv_n = adv_n * q_n_std + q_n_mean
 
         #====================================================================================#
         # Advantage Normalization
@@ -266,7 +262,6 @@ def main():
     parser.add_argument('--learning_rate', '-lr', type=float, default=5e-3)
     parser.add_argument('--reward_to_go', '-rtg', action='store_true')
     parser.add_argument('--dont_normalize_advantages', '-dna', action='store_true')
-    parser.add_argument('--nn_baseline', '-bl', action='store_true')
     parser.add_argument('--seed', type=int, default=666)
     parser.add_argument('--n_experiments', '-e', type=int, default=1)
     parser.add_argument('--n_layers', '-l', type=int, default=1)
@@ -283,7 +278,7 @@ def main():
     for e in range(args.n_experiments):
         seed = args.seed + 10*e
         print('Running experiment with seed %d'%seed)
-        train_PG(
+        train_MAPG(
             exp_name=args.exp_name,   
             n_iter=args.n_iter,
             gamma=args.discount,
@@ -292,7 +287,6 @@ def main():
             reward_to_go=args.reward_to_go,
             logdir=os.path.join(logdir,'%d'%seed),
             normalize_advantages=not(args.dont_normalize_advantages),
-            nn_baseline=args.nn_baseline, 
             seed=seed,
             n_layers=args.n_layers,
             size=args.size
