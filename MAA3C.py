@@ -51,7 +51,6 @@ def train_MAPG(exp_name='',
              gamma=1.0, 
              min_timesteps_per_batch=1000, 
              learning_rate=5e-3, 
-             reward_to_go=True, 
              logdir=None, 
              normalize_advantages=True,
              seed=101,
@@ -79,13 +78,13 @@ def train_MAPG(exp_name='',
     # Env setup
     #========================================================================================#
     env = Simulator(seed = 101,
-                 N_prod = 2,
-                 Tstamp = 20,
-                 price = np.array([[1.5, 1.5]]),
-                 costQ = np.array([[0.1, 0.1]]),
-                 costInv = np.array([[0.2, 0.2]]),
-                 costLastInv = np.array([[1, 1]]),
-                 costBack = np.array([[0.5, 0.5]]) )
+                    N_prod = 2,
+                    Tstamp = 20,
+                    price = np.array([[1.5, 1.5]]),
+                    costQ = np.array([[0.1, 0.1]]),
+                    costInv = np.array([[0.2, 0.2]]),
+                    costLastInv = np.array([[1, 1]]),
+                    costBack = np.array([[0.5, 0.5]]) )
     # Observation and action sizes
     ob_dim = env.obs_dim()
     ac_dim = env.act_dim()
@@ -95,42 +94,55 @@ def train_MAPG(exp_name='',
     #========================================================================================#
     # PG Networks
     #========================================================================================#
-    sy_ob_no = tf.placeholder(shape=[None, ob_dim], name="ob", dtype=tf.float32)
-    sy_ac_na = tf.placeholder(shape=[None, ac_dim], name="ac", dtype=tf.float32) 
-    sy_adv_n = tf.placeholder(shape = [None], name = 'adv', dtype = tf.float32)
+    
 
-    sy_mean = build_mlp(input_placeholder = sy_ob_no, 
-                        output_size = ac_dim,
-                        scope = 'continuous' + str(seed), 
-                        n_layers=n_layers, 
-                        size=size)
+    def PGNet(sy_ob_no, sy_ac_na, sy_adv_n, agent_id):
 
-    sy_logstd = tf.Variable(tf.truncated_normal(shape = [1, ac_dim], stddev = 0.1))
-    sy_sampled_ac = sy_mean + tf.multiply(tf.random_normal(shape = tf.shape(sy_mean)), tf.exp(sy_logstd))
-    MVN_dist = tf.contrib.distributions.MultivariateNormalDiag(sy_mean, tf.exp(sy_logstd))
-    sy_logprob_n = MVN_dist.log_prob(sy_ac_na)
+        sy_mean = build_mlp(input_placeholder = sy_ob_no, 
+                            output_size = ac_dim,
+                            scope = str(seed) + 'MA_' + str(agent_id), 
+                            n_layers = n_layers, 
+                            size = size)
 
-    # Loss function for PG network
-    loss = -tf.reduce_mean(tf.multiply(sy_logprob_n, sy_adv_n)) # Loss function that we'll differentiate to get the policy gradient.
-    update_op = tf.train.AdamOptimizer(learning_rate).minimize(loss)
+        sy_logstd = tf.Variable(tf.truncated_normal(shape = [1, ac_dim], stddev = 0.1), name = 'var_std' + str(agent_id))
+        sy_sampled_ac = sy_mean + tf.multiply(tf.random_normal(shape = tf.shape(sy_mean)), tf.exp(sy_logstd))
+        MVN_dist = tf.contrib.distributions.MultivariateNormalDiag(sy_mean, tf.exp(sy_logstd))
+        sy_logprob_n = MVN_dist.log_prob(sy_ac_na)
+
+        # Loss function for PG network
+        loss = -tf.reduce_mean(tf.multiply(sy_logprob_n, sy_adv_n)) # Loss function that we'll differentiate to get the policy gradient.
+        update_op = tf.train.AdamOptimizer(learning_rate).minimize(loss)
+
+        return sy_sampled_ac, loss, update_op
 
     #========================================================================================#
     # Critic network
     #========================================================================================#
-    sy_ob_critic = tf.placeholder(shape=[None, ob_dim + ac_dim * nAgent], name="ob", dtype=tf.float32)
+    
+    def CriticNet(sy_ob_critic, baseline_target, agent_id):
+        baseline_prediction = tf.squeeze(build_mlp(
+                                sy_ob_critic, 
+                                output_size = 1, 
+                                scope = str(seed) + "critic_" + str(agent_id),
+                                n_layers = n_layers,
+                                size = size))
+    
+        
+        baseline_loss = tf.nn.l2_loss(baseline_target - baseline_prediction)
+        baseline_update_op = tf.train.AdamOptimizer(learning_rate).minimize(baseline_loss)
+        return baseline_prediction, baseline_loss, baseline_update_op
+    #========================================================================================#
+    # Add networks in a loop
+    #========================================================================================#
+    for agent in range(nAgent):
+        exec("sy_ob_no_%s = tf.placeholder(shape=[None, ob_dim], name='ob' + str(agent), dtype=tf.float32)"%(agent))
+        exec("sy_ac_na_%s = tf.placeholder(shape=[None, ac_dim], name='ac' + str(agent), dtype=tf.float32)"%(agent))
+        exec("sy_adv_n_%s = tf.placeholder(shape = [None], name = 'adv' + str(agent), dtype = tf.float32)"%(agent))
+        exec("sy_ob_critic_%s = tf.placeholder(shape=[None, ob_dim + ac_dim * nAgent], name='critic_ob' + str(agent), dtype=tf.float32)"%(agent))
+        exec("baseline_target_%s = tf.placeholder(shape = [None], name = 'baseline_target_qn' + str(agent), dtype = tf.float32)"%(agent))
 
-    baseline_prediction = tf.squeeze(build_mlp(
-                            sy_ob_critic, 
-                            output_size = 1, 
-                            scope = "nn_baseline" + str(seed),
-                            n_layers = n_layers,
-                            size = size))
-    # Define placeholders for targets, a loss function and an update op for fitting a 
-    # neural network baseline. These will be used to fit the neural network baseline. 
-    baseline_target = tf.placeholder(shape = [None], name = 'baseline_target_qn', dtype = tf.float32)
-    baseline_loss = tf.nn.l2_loss(baseline_target - baseline_prediction)
-    baseline_update_op = tf.train.AdamOptimizer(learning_rate).minimize(baseline_loss)
-
+        exec("sy_sampled_ac_%s, loss_%s, update_op_%s = PGNet(sy_ob_no_%s, sy_ac_na_%s, sy_adv_n_%s, agent)"%(agent, agent, agent, agent, agent, agent))
+        exec("baseline_prediction_%s, baseline_loss_%s, baseline_update_op_%s = CriticNet(sy_ob_critic_%s, baseline_target_%s, agent)"%(agent, agent, agent, agent, agent))
     #========================================================================================#
     # Tensorflow Engineering: Config, Session, Variable initialization
     #========================================================================================#
@@ -148,6 +160,9 @@ def train_MAPG(exp_name='',
     total_numpaths = 0
     
     for itr in range(n_iter):
+        #========================#
+        # Sampling
+        #========================#
         randk = 0 + itr * seed
         print("********** Iteration %i ************"%itr)
 
@@ -156,8 +171,6 @@ def train_MAPG(exp_name='',
         num_path = 0
         paths = []
         while True:
-            # np.diag(np.array([0.1, 0.1]))
-            # np.array([[0.25, -0.2], [-0.2, 0.25]])
             demand = env.demandGenerator(mu = np.array([5, 5]), cov = np.diag(np.array([0.25, 0.25])), seed = randk)
             # Could be optimized by generating a batch demand vector. Fix this later!
             randk += 1
@@ -196,17 +209,14 @@ def train_MAPG(exp_name='',
         # print(ac_na.shape)
         # print(path['reward'].shape)
 
-        #========================================================================================#
+        #========================#
         # Compute Q value
-        #========================================================================================#
-        if reward_to_go:
-            q_n = np.concatenate([[np.npv((1/gamma - 1), path["reward"][i:]) for i in range(len(path["reward"]))] for path in paths])
-        else:
-            q_n = np.concatenate([[np.npv((1/gamma - 1), path["reward"])]*len(path["reward"]) for path in paths])        
-
-        #====================================================================================#
+        #========================#
+        q_n = np.concatenate([[np.npv((1/gamma - 1), path["reward"][i:]) for i in range(len(path["reward"]))] for path in paths])
+        
+        #========================#
         # Compute Baselines
-        #====================================================================================#
+        #========================#
 
         q_n_mean = q_n.mean()
         q_n_std = q_n.std()
@@ -214,9 +224,9 @@ def train_MAPG(exp_name='',
         b_n = baseline_prediction
         adv_n_baseline = q_n - b_n
 
-        #====================================================================================#
+        #====================================#
         # Optimizing Neural Network Baseline
-        #====================================================================================#
+        #====================================#
         _, adv_n = sess.run([baseline_update_op, adv_n_baseline], feed_dict={baseline_target: q_n, sy_ob_critic: TODO})
         adv_n = adv_n * q_n_std + q_n_mean
 
