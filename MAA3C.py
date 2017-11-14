@@ -171,9 +171,6 @@ def train_MAPG(exp_name='',
         num_path = 0
         paths = []
         while True:
-            demand = env.demandGenerator(mu = np.array([5, 5]), cov = np.diag(np.array([0.25, 0.25])), seed = randk)
-            # Could be optimized by generating a batch demand vector. Fix this later!
-            randk += 1
             ob = env.randomInitialStateGenerator()
             obs, acs, rewards = [], [], []
             last = False
@@ -184,6 +181,8 @@ def train_MAPG(exp_name='',
                     last = True
                 obs.append(ob.flatten())
                 ac = sess.run(sy_sampled_ac, feed_dict={sy_ob_no : ob})
+                demand = env.demandGenerator(TODO, seed = randk)
+                randk += 1
                 # ac = ac[0]
                 acs.append(ac.flatten())
                 ob, rew = env.step(ac, ob, demand[steps, :], last)
@@ -265,12 +264,11 @@ def train_MAPG(exp_name='',
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--exp_name', type=str, default='SingleAgent')
+    parser.add_argument('--exp_name', type=str, default='MultiAgent')
     parser.add_argument('--discount', type=float, default=0.9)
     parser.add_argument('--n_iter', '-n', type=int, default=500)
     parser.add_argument('--batch_size', '-b', type=int, default=1280)
     parser.add_argument('--learning_rate', '-lr', type=float, default=5e-3)
-    parser.add_argument('--reward_to_go', '-rtg', action='store_true')
     parser.add_argument('--dont_normalize_advantages', '-dna', action='store_true')
     parser.add_argument('--seed', type=int, default=666)
     parser.add_argument('--n_experiments', '-e', type=int, default=1)
@@ -294,7 +292,6 @@ def main():
             gamma=args.discount,
             min_timesteps_per_batch=args.batch_size,
             learning_rate=args.learning_rate,
-            reward_to_go=args.reward_to_go,
             logdir=os.path.join(logdir,'%d'%seed),
             normalize_advantages=not(args.dont_normalize_advantages),
             seed=seed,

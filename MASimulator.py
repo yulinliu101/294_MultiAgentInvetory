@@ -33,7 +33,7 @@ class MASimulator:
 
     def act_dim(self):
         # add another axis in the future
-        return self.N_prod
+        return self.N_prod * 2
 
     def demandGenerator(self, mu, cov, seed = 123):
         # generate multivariate log normal random variables
