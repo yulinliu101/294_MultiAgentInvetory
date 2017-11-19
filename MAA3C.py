@@ -84,20 +84,20 @@ def train_MAPG(exp_name='',
     env1 = Simulator(seed = 101,
                     N_agent = nAgent,
                     N_prod = 3,
-                 Tstamp = 20,
-                 costQ = np.array([[0.1, 0.1, 0.1]]),
+                 Tstamp = 50,
+                 costQ = np.array([[0.3, 0.3, 0.3]]),
                  costInv = np.array([[0.2, 0.2, 0.2]]),
-                 costLastInv = np.array([[1, 1, 1]]),
-                 costBack = np.array([[0.5, 0.5, 0.5]]) )
+                 costLastInv = np.array([[2, 2, 2]]),
+                 costBack = np.array([[0.75, 0.75, 0.75]])  )
 
     env2 = Simulator(seed = 202,
                     N_agent = nAgent,
                     N_prod = 3,
-                 Tstamp = 20,
-                 costQ = np.array([[0.1, 0.1, 0.1]]),
+                 Tstamp = 50,
+                 costQ = np.array([[0.3, 0.3, 0.3]]),
                  costInv = np.array([[0.2, 0.2, 0.2]]),
-                 costLastInv = np.array([[1, 1, 1]]),
-                 costBack = np.array([[0.5, 0.5, 0.5]]) )
+                 costLastInv = np.array([[2, 2, 2]]),
+                 costBack = np.array([[0.75, 0.75, 0.75]]) )
     # Observation and action sizes
     ob_dim = env1.obs_dim()
     ac_dim = env1.act_dim()
@@ -228,10 +228,10 @@ def train_MAPG(exp_name='',
                 actList = [ac1.reshape(-1, 2), ac2.reshape(-1, 2)]
 
                 demand = env1.demandGenerator_p(actList,
-                                                 M = np.array([3, 3, 3]).reshape(-1,1),
+                                                 M = np.array([10, 10, 10]).reshape(-1,1),
                                                  V = np.array([5,5,5]).reshape(-1,1),
-                                                 sens = np.array([1, 1, 1]).reshape(-1,1),
-                                                 cov = np.diag(np.array([0.25, 0.25, 0.25])),
+                                                 sens = np.array([1.5, 1.5, 1.5]).reshape(-1,1),
+                                                 cov = np.diag(np.array([0.1, 0.1, 0.1])),
                                                  seed = randk1)
                 demand1 = demand[:,0]
                 demand2 = demand[:,1]
@@ -295,6 +295,7 @@ def train_MAPG(exp_name='',
         # Compute Baselines
         #========================#
 
+
         q_n_mean1 = q_n1.mean()
         q_n_std1 = q_n1.std()
         q_n1 = (q_n1 - q_n_mean1)/q_n_std1
@@ -306,6 +307,11 @@ def train_MAPG(exp_name='',
         q_n2 = (q_n2 - q_n_mean2)/q_n_std2
         b_n2 = baseline_prediction_2
         adv_n_baseline2 = q_n2 - b_n2
+
+        # if bootstrap:
+        #     last_critic_ob_no1 = np.concatenate([path["criticObservation"] for path in paths1])
+        #     lastFit1 = sess.run(baseline_prediction_1, 
+        #                         feed_dict = {sy_ob_critic_1: critic_ob_no1[]})
 
         #====================================#
         # Optimizing Neural Network Baseline
@@ -368,11 +374,11 @@ def train_MAPG(exp_name='',
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--exp_name', type=str, default='MultiAgent')
+    parser.add_argument('--exp_name', type=str, default='MultiAgentWTime')
     parser.add_argument('--discount', type=float, default=0.75)
-    parser.add_argument('--n_iter', '-n', type=int, default=1500)
+    parser.add_argument('--n_iter', '-n', type=int, default=2000)
     parser.add_argument('--batch_size', '-b', type=int, default=2560)
-    parser.add_argument('--learning_rate', '-lr', type=float, default=2.5e-3)
+    parser.add_argument('--learning_rate', '-lr', type=float, default=1e-3)
     parser.add_argument('--dont_normalize_advantages', '-dna', action='store_true')
     parser.add_argument('--seed', type=int, default=666)
     parser.add_argument('--n_experiments', '-e', type=int, default=1)

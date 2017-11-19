@@ -26,7 +26,7 @@ class MASimulator:
         return self.N_agent
         
     def obs_dim(self):
-        return (self.N_prod, 1)
+        return (self.N_prod + self.Tstamp, 1)
 
     def act_dim(self):
         # add another axis in the future
@@ -66,7 +66,8 @@ class MASimulator:
         share = M.reshape(-1,1) * eu / (np.sum(eu, 1) + 1).reshape(-1,1)
         # using a simple normal shock
         shock = np.random.multivariate_normal(np.zeros(self.N_prod), cov = cov, size = self.N_agent).T
-        return share + shock
+        demand = share + shock
+        return np.maximum(np.zeros(shape = demand.shape), demand)
         
 
     def actionSpace(self):
@@ -81,13 +82,14 @@ class MASimulator:
     def stateSpace(self):
         return -10., 10.
 
-    def randomStateGenerator(self, Nsample = 1):
-        minInv, maxInv = self.stateSpace()
-        return np.random.uniform(low = minInv, high = maxInv, size = (Nsample, self.N_prod))
+    # def randomStateGenerator(self, Nsample = 1):
+    #     minInv, maxInv = self.stateSpace()
+    #     return np.random.uniform(low = minInv, high = maxInv, size = (Nsample, self.N_prod))
 
     def randomInitialStateGenerator(self):
         _, maxInv = self.stateSpace()
-        return np.random.uniform(low = 0, high = maxInv, size = (1, self.N_prod))
+        initTime = [1] + [0] * (self.Tstamp - 1)
+        return np.append(np.array([initTime]), np.random.uniform(low = 0, high = maxInv, size = (1, self.N_prod))).reshape(1, -1)
 
 
     def _reward(self, action, inventory, demand, last = False):
@@ -106,14 +108,21 @@ class MASimulator:
                                  self.costInv.dot(np.maximum(np.zeros(shape = inventory.shape), inventory).T) - 
                                  self.costBack.dot(np.minimum(np.zeros(shape = inventory.shape), inventory).T)))[0][0]
 
-    def _nextInventory(self, curInventory, curAction, curDemand):
+    def _nextInventory(self, curState, curAction, curDemand):
         productIn = curAction[:,0]
-        return (curInventory + productIn - curDemand).reshape(1,-1)
+        curTimestamp = curState[:self.Tstamp]
+        curInventory = curState[self.Tstamp:]
+        nextTimestamp = np.roll(curTimestamp, 1)
+        nextInventory = (curInventory + productIn - curDemand).reshape(1,-1)
 
-    def step(self, action, currentInventory, curDemand, last):
-        nextInventory = self._nextInventory(currentInventory, action, curDemand)
+        return nextTimestamp, nextInventory
+
+    def step(self, action, currentState, curDemand, last):
+        
+        nextTimestamp, nextInventory = self._nextInventory(currentState, action, curDemand)
         reward = self._reward(action, nextInventory, curDemand, last)
-        return nextInventory, reward
+        nextState = np.append(nextTimestamp, nextInventory).reshape(1, -1)
+        return nextState, reward
 
 
 
