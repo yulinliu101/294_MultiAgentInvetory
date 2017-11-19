@@ -6,6 +6,7 @@ import time
 import inspect
 from MASimulator import MASimulator as Simulator
 import random
+import pickle
 #============================================================================================#
 # Utilities
 #============================================================================================#
@@ -84,26 +85,27 @@ def train_MAPG(exp_name='',
     env1 = Simulator(seed = 101,
                     N_agent = nAgent,
                     N_prod = 3,
-                 Tstamp = 10,
-                 costQ = np.array([[0.3, 0.3, 0.3]]),
-                 costInv = np.array([[0.2, 0.2, 0.2]]),
-                 costLastInv = np.array([[2, 2, 2]]),
-                 costBack = np.array([[0.75, 0.75, 0.75]])  )
+                    Tstamp = 10,
+                    costQ = np.array([[0.3, 0.3, 0.3]]),
+                    costInv = np.array([[0.2, 0.2, 0.2]]),
+                    costLastInv = np.array([[2, 2, 2]]),
+                    costBack = np.array([[0.75, 0.75, 0.75]])  )
 
     env2 = Simulator(seed = 202,
                     N_agent = nAgent,
                     N_prod = 3,
-                 Tstamp = 10,
-                 costQ = np.array([[0.3, 0.3, 0.3]]),
-                 costInv = np.array([[0.2, 0.2, 0.2]]),
-                 costLastInv = np.array([[2, 2, 2]]),
-                 costBack = np.array([[0.75, 0.75, 0.75]]) )
+                    Tstamp = 10,
+                    costQ = np.array([[0.3, 0.3, 0.3]]),
+                    costInv = np.array([[0.2, 0.2, 0.2]]),
+                    costLastInv = np.array([[2, 2, 2]]),
+                    costBack = np.array([[0.75, 0.75, 0.75]]) )
     # Observation and action sizes
     ob_dim = env1.obs_dim()
     ac_dim = env1.act_dim()
     
     print('observation dimension is: ', ob_dim)
     print('action dimension is: ', ac_dim)
+    print('critic network input dimension is:', ob_dim[0] + ac_dim[0] * ac_dim[1] * nAgent)
     #========================================================================================#
     # PG Networks
     #========================================================================================#
@@ -271,6 +273,9 @@ def train_MAPG(exp_name='',
                 break
         total_numpaths += num_path
         total_timesteps += timesteps_this_batch
+        if last and itr == n_iter - 1:
+            pickle.dump(path1, open(logdir + '/trained_path1_sample.pkl', 'wb'), protocol = 2)
+            pickle.dump(path2, open(logdir + '/trained_path2_sample.pkl', 'wb'), protocol = 2)
 
         # Build arrays for observation, action for the policy gradient update by concatenating 
         # across paths
