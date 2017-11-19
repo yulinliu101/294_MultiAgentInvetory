@@ -387,7 +387,7 @@ def main():
     parser.add_argument('--dont_normalize_advantages', '-dna', action='store_true')
     parser.add_argument('--seed', type=int, default=666)
     parser.add_argument('--n_experiments', '-e', type=int, default=1)
-    parser.add_argument('--n_layers', '-l', type=int, default=1)
+    parser.add_argument('--n_layers', '-l', type=int, default=2)
     parser.add_argument('--size', '-s', type=int, default=32)
     args = parser.parse_args()
 
