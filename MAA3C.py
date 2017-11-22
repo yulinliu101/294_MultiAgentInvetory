@@ -381,7 +381,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--exp_name', type=str, default='MultiAgentWTime')
     parser.add_argument('--discount', type=float, default=0.75)
-    parser.add_argument('--n_iter', '-n', type=int, default=2000)
+    parser.add_argument('--n_iter', '-n', type=int, default=6000)
     parser.add_argument('--batch_size', '-b', type=int, default=2560)
     parser.add_argument('--learning_rate', '-lr', type=float, default=1e-3)
     parser.add_argument('--dont_normalize_advantages', '-dna', action='store_true')
