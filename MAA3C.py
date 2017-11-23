@@ -188,7 +188,7 @@ def train_MAPG(exp_name='',
 
     total_timesteps = 0
     total_numpaths = 0
-    
+    demand_cov = np.array([[0.1, -0.5*0.3, -0.5*0.3], [-0.5*0.3, 0.1 , 0.5*0.3], [-0.5*0.3, 0.5*0.3, 0.1]])
     for itr in range(n_iter):
         #========================#
         # Sampling
@@ -202,6 +202,7 @@ def train_MAPG(exp_name='',
         num_path = 0
         paths1 = []
         paths2 = []
+        
         while True:
             steps = 0
             last = False
@@ -233,7 +234,7 @@ def train_MAPG(exp_name='',
                                                  M = np.array([10, 10, 10]).reshape(-1,1),
                                                  V = np.array([5,5,5]).reshape(-1,1),
                                                  sens = np.array([1.5, 1.5, 1.5]).reshape(-1,1),
-                                                 cov = np.diag(np.array([0.1, 0.1, 0.1])),
+                                                 cov = demand_cov,
                                                  seed = randk1)
                 demand1 = demand[:,0]
                 demand2 = demand[:,1]
@@ -381,7 +382,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--exp_name', type=str, default='MultiAgentWTime')
     parser.add_argument('--discount', type=float, default=0.75)
-    parser.add_argument('--n_iter', '-n', type=int, default=6000)
+    parser.add_argument('--n_iter', '-n', type=int, default=10000)
     parser.add_argument('--batch_size', '-b', type=int, default=2560)
     parser.add_argument('--learning_rate', '-lr', type=float, default=1e-3)
     parser.add_argument('--dont_normalize_advantages', '-dna', action='store_true')
